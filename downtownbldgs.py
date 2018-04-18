@@ -84,8 +84,11 @@ bxmax = int(downtown_buildings[0][3].extent.XMax)+1
 bymin = int(downtown_buildings[0][3].extent.YMin)-1
 bymax = int(downtown_buildings[0][3].extent.YMax)+1
 
+# array to hold the green values that will be used to find the standard dev
 sdarray = []
 
+# Loop through the first building in the downtown_buildings array
+# and append all the green values to the sdarray
 for j in range (bymin, bymin+ 10):  #bymax):
     for i in range (bxmin, bxmin + 10):  #bxmax):
         if (arcpy.Point(i,j).within(downtown_buildings[0][3])):
@@ -93,15 +96,10 @@ for j in range (bymin, bymin+ 10):  #bymax):
             print (nlcd[1][i-bxmin][j-bymin])
             sdarray.append(nlcd[1][i-bxmin][j-bymin])
             
-
+# Convert to numpy array to take standard dev
 arr = np.array(sdarray)
 print np.std(arr)
 
-
-
-
-#out_file = "shape_raster_conv.tiff"
-#thingy = PolygonToRaster_conversion(downtown_buildings[0][3], "SHAPE@", outfile)
 
 # convert building polygon to a raster
 # nlcd[x][y] is centroid? of the building. Can we refer to that building, and get the standard deviation?
