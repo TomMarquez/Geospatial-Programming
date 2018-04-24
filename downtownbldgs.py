@@ -25,7 +25,7 @@ def get_raster_path():
     cwd_split = cwd.split("\\")
     if cwd_split[2] == "tommarquez":
         return 'C:/Users/tommarquez/Documents/School/Geospatial-Programming_files/1659_2635/1659_2635.tif'
-    return '1659_2635.tif' # TODO: Valerie, add the full path to the rester file here
+    return '1659_2635.tif' # TODO: Valerie, add the full path of your raster file here
 
 def building_array(x_coords, y_coords, shape_file):
     """This method takes in the x and y coordinates that define the area of focus of the 
@@ -35,7 +35,8 @@ def building_array(x_coords, y_coords, shape_file):
     TODO: May need to take out the total amount of solar panels. This may need to go into
     another method...maybe
     """
-
+    # Industrial panels are 77" x 39", so 20.85 sq ft
+    solar_panel = 20.85
     total_area = 0.0
     total_panels = 0
     elev_thresh = 30
@@ -65,11 +66,21 @@ def building_array(x_coords, y_coords, shape_file):
                         total_panels = total_panels + math.floor(area / solar_panel)
     return downtown_buildings, total_area, total_panels
 
+def is_south_building_taller(shape_file, x_coords, y_coords):
+    """This method should return true if building south of the building at
+    x y coords is taller
+    This method converts the shape file to raster and uses a moving window to look
+    at the polygon south
+    """
+    raster_ext = 'raster.tif'
+    if arcpy.Exists(raster_ext):
+        arcpy.Delete_management(raster_ext)
+        print("WARNING: deleting file " + raster_ext)
+    raster_file = arcpy.FeatureToRaster_conversion(shape_file, "elevation", raster_ext)
+    print(raster_file)
 
 env.workspace = get_workspace()
-
 fc = "buildings.shp"
-
 # get access to a DEM raster dataset
 arcpy.CheckOutExtension("Spatial")
 #create raster object
@@ -84,9 +95,6 @@ arcpy.CheckInExtension("Spatial")
 # convert to numpy array
 nlcd = arcpy.RasterToNumPyArray(nlcd_rstr)
 
-# Industrial panels are 77" x 39", so 20.85 sq ft
-solar_panel = 20.85
-
 # Variables to hold the x and y coordinates of downtown
 #x_coords = [1655468.109, 1663714.632]
 #y_coords = [2635419.875, 2638805.296]
@@ -100,6 +108,8 @@ y_coords = [2635011.822, 2637910.260]
 
 # Array to hold all of the buildings downtown, var for total area, and var for total panels in given area
 downtown_buildings, total_area, total_panels = building_array(x_coords, y_coords, fc)
+
+is_south_building_taller(fc, x_coords, y_coords)
 
 # Print all the buildings in the array
 #for building in downtown_buildings:
@@ -122,12 +132,12 @@ sdarray = []
 for j in range (bymin, bymin+ 10):  #bymax):
     for i in range (bxmin, bxmin + 10):  #bxmax):
         if (arcpy.Point(i,j).within(downtown_buildings[0][3])):
-            print (nlcd[1][i-bxmin][j-bymin])
+            #print (nlcd[1][i-bxmin][j-bymin])
             sdarray.append(nlcd[1][i-bxmin][j-bymin])
             
 # Convert to numpy array to take standard dev
 arr = np.array(sdarray)
-print np.std(arr)
+#print np.std(arr)
 
 
 # convert building polygon to a raster
