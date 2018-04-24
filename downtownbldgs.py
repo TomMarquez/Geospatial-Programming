@@ -25,7 +25,7 @@ def get_raster_path():
     cwd_split = cwd.split("\\")
     if cwd_split[2] == "tommarquez":
         return 'C:/Users/tommarquez/Documents/School/Geospatial-Programming_files/1659_2635/1659_2635.tif'
-    return '1659_2635.tif' # TODO: Valerie, add the full path of your raster file here
+    return 'C:/Users/Valerie/Desktop/square_tiff/1659_2635.tif' # Done TODO: Valerie, add the full path of your raster file here
 
 def building_array(x_coords, y_coords, shape_file):
     """This method takes in the x and y coordinates that define the area of focus of the 
@@ -118,26 +118,45 @@ is_south_building_taller(fc, x_coords, y_coords)
 #for building in downtown_buildings:
 #print (downtown_buildings[0][3])
 
-# add/sub 1 to include whole building
-bxmin = int(downtown_buildings[0][3].extent.XMin)-1
-bxmax = int(downtown_buildings[0][3].extent.XMax)+1
-bymin = int(downtown_buildings[0][3].extent.YMin)-1
-bymax = int(downtown_buildings[0][3].extent.YMax)+1
+# loop through all buildings in array that are in the raster we are looking at
+# eventually, we will look at all the rasters ...
 
-# array to hold the green values that will be used to find the standard dev
-sdarray = []
+# add field to shape for the std values, red, green, blue, for each building 
 
-# Loop through the first building in the downtown_buildings array
-# and append all the green values to the sdarray
-for j in range (bymin, bymin+ 10):  #bymax):
-    for i in range (bxmin, bxmin + 10):  #bxmax):
-        if (arcpy.Point(i,j).within(downtown_buildings[0][3])):
-            #print (nlcd[1][i-bxmin][j-bymin])
-            sdarray.append(nlcd[1][i-bxmin][j-bymin])
-            
-# Convert to numpy array to take standard dev
-arr = np.array(sdarray)
-#print np.std(arr)
+for buildings in downtown_buildings:
+    # array to hold the values that will be used to find the standard dev
+    sdarray_green = []
+    sdarray_red = []
+    sdarray_blue = []
+    # add/sub 1 to include whole building
+    # bxmin = int(downtown_buildings[0][3].extent.XMin)-1
+    # bxmax = int(downtown_buildings[0][3].extent.XMax)+1
+    # bymin = int(downtown_buildings[0][3].extent.YMin)-1
+    # bymax = int(downtown_buildings[0][3].extent.YMax)+1
+    bxmin = int(buildings[3].extent.XMin)-1
+    bxmax = int(buildings[3].extent.XMax)+1
+    bymin = int(buildings[3].extent.YMin)-1
+    bymax = int(buildings[3].extent.YMax)+1
+    
+    
+    # Loop through the building in the downtown_buildings array
+    # and append all the green, red, and blue values to the sdarray
+    for j in range (bymin, bymax):
+        for i in range (bxmin, bxmax):
+            if (arcpy.Point(i,j).within(buildings[3])):
+                #print (nlcd[1][i-bxmin][j-bymin])
+                sdarray_green.append(nlcd[1][i-bxmin][j-bymin])
+                sdarray_red.append(nlcd[0][i-bxmin][j-bymin])
+                sdarray_blue.append(nlcd[2][i-bxmin][j-bymin])
+                
+    # Convert to numpy array to take standard dev
+    arr_green = np.array(sdarray_green)
+    arr_red = np.array(sdarray_red)
+    arr_blue = np.array(sdarray_blue)
+    print ('green: ' + str(np.std(arr_green)) + ' red: ' + str(np.std(arr_red)) + ' blue: ' + str(np.std(arr_blue)))
+    
+    # Do something with these stds! UpdateCursor with columns for each std
+
 
 
 # convert building polygon to a raster
