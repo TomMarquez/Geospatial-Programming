@@ -27,7 +27,7 @@ def get_raster_path():
         return 'C:/Users/tommarquez/Documents/School/Geospatial-Programming_files/1659_2635/1659_2635.tif'
     return 'C:/Users/Valerie/Desktop/square_tiff/1659_2635.tif' # Done TODO: Valerie, add the full path of your raster file here
 
-def building_array(x_coords, y_coords, shape_file):
+def building_array(x_coords, y_coords, shape_file, out_shape):
     """This method takes in the x and y coordinates that define the area of focus of the 
     shape file.
     Returns: a building array, total usable area, and the amount of solar panels that can 
@@ -39,31 +39,41 @@ def building_array(x_coords, y_coords, shape_file):
     solar_panel = 20.85
     total_area = 0.0
     total_panels = 0
+    
+    # Thresholds of elevation and area
     elev_thresh = 30
     area_thresh = 2000
+    
     # Array to hold all of the buildings downtown
     downtown_buildings = []
     # Variable that stores the last seen building
     # Prevents a polygon being added to the array more than once
     building_name = ""
-    fields = ["SHAPE@XY", "CURRENT_TI", "ELEVATION", "SHAPE@"]
+    fields = ["FID", "SHAPE@XY", "CURRENT_TI", "ELEVATION", "SHAPE@"]
     # max_area = 0
-    with arcpy.da.SearchCursor(fc, fields) as cursor:
+    out_cursor = arcpy.da.InsertCursor(out_shape, fields)
+    with arcpy.da.SearchCursor(shape_file, fields) as cursor:
         for row in cursor:
-            shape = row[0]
+            shape = row[1]
             # shape[0] shape[1] is the x y of the centroid of the polygon (building)
             if shape[0] > x_coords[0] and shape[0] < x_coords[1] and shape[1] > y_coords[0] and shape[1] < y_coords[
-                1] and row[2] > elev_thresh:
+                1] and row[3] > elev_thresh:
                 # row[2] is elevation, want to be at least 30
                 # Does not add blank polygons to the array or buildings already added
                 # Will probably need to add the blank polygons since they are buildings downtown, but
                 # just for testing, I only added the buildings that have names associated with the polygon.
                 if row[1] != " " and building_name != row[1]:
-                    area = row[3].area
+                    area = row[4].area
                     if area > area_thresh:
                         total_area = total_area + area
                         downtown_buildings.append(row)
+                        out_cursor.insertRow(row)
+                        
                         total_panels = total_panels + math.floor(area / solar_panel)
+    del row
+    del cursor
+    del out_cursor
+    
     return downtown_buildings, total_area, total_panels
 
 def is_south_building_taller(shape_file, x_coords, y_coords):
@@ -81,6 +91,15 @@ def is_south_building_taller(shape_file, x_coords, y_coords):
 
 env.workspace = get_workspace()
 fc = "buildings.shp"
+out_fc = "anch_good_sites.shp"
+if arcpy.Exists(out_fc):
+    arcpy.Delete_management(out_fc)
+
+# Need to set the Spatial Reference of the out_fc. 
+sr = 'NAD 1983 StatePlane Alaska 4 FIPS 5004 Feet'
+
+arcpy.CreateFeatureclass_management(env.workspace, out_fc, "Polygon", fc, "", "","", sr)
+ 
 # get access to a DEM raster dataset
 arcpy.CheckOutExtension("Spatial")
 #create raster object
@@ -107,60 +126,73 @@ x_coords = [1659059.606, 1661932.002]
 y_coords = [2635011.822, 2637910.260]
 
 # Array to hold all of the buildings downtown, var for total area, and var for total panels in given area
-downtown_buildings, total_area, total_panels = building_array(x_coords, y_coords, fc)
+downtown_buildings, total_area, total_panels = building_array(x_coords, y_coords, fc, out_fc)
+
+# add field to shape for the std values, red, green, blue, for each building  
+arcpy.AddField_management(out_fc, 'std_red', "FLOAT")
+arcpy.AddField_management(out_fc, 'std_green', "FLOAT")
+arcpy.AddField_management(out_fc, 'std_blue', "FLOAT")    
+
 
 is_south_building_taller(fc, x_coords, y_coords)
 
-# Print all the buildings in the array
-#for building in downtown_buildings:
-    #print(building[1] + " area: " + str(building[3].area) + " elevation: " + str(building[2]))
-
-#for building in downtown_buildings:
-#print (downtown_buildings[0][3])
 
 # loop through all buildings in array that are in the raster we are looking at
 # eventually, we will look at all the rasters ...
 
-# add field to shape for the std values, red, green, blue, for each building 
-
-for buildings in downtown_buildings:
-    # array to hold the values that will be used to find the standard dev
-    sdarray_green = []
-    sdarray_red = []
-    sdarray_blue = []
-    # add/sub 1 to include whole building
-    # bxmin = int(downtown_buildings[0][3].extent.XMin)-1
-    # bxmax = int(downtown_buildings[0][3].extent.XMax)+1
-    # bymin = int(downtown_buildings[0][3].extent.YMin)-1
-    # bymax = int(downtown_buildings[0][3].extent.YMax)+1
-    bxmin = int(buildings[3].extent.XMin)-1
-    bxmax = int(buildings[3].extent.XMax)+1
-    bymin = int(buildings[3].extent.YMin)-1
-    bymax = int(buildings[3].extent.YMax)+1
+#for buildings in downtown_buildings:
+with arcpy.da.UpdateCursor(out_fc, ["SHAPE@", "std_red", "std_green", "std_blue"]) as cursor:
+    for row in cursor:
+        # array to hold the values that will be used to find the standard dev
+        sdarray_green = []
+        sdarray_red = []
+        sdarray_blue = []
+        bldpoly = row[0]
+        # add/sub 1 to include whole building
+        # bxmin = int(downtown_buildings[0][3].extent.XMin)-1
+        # bxmax = int(downtown_buildings[0][3].extent.XMax)+1
+        # bymin = int(downtown_buildings[0][3].extent.YMin)-1
+        # bymax = int(downtown_buildings[0][3].extent.YMax)+1
+        # bxmin = int(buildings[4].extent.XMin)-1
+        # bxmax = int(buildings[4].extent.XMax)+1
+        # bymin = int(buildings[4].extent.YMin)-1
+        # bymax = int(buildings[4].extent.YMax)+1
+        bxmin = int(bldpoly.extent.XMin)-1
+        bxmax = int(bldpoly.extent.XMax)+1
+        bymin = int(bldpoly.extent.YMin)-1
+        bymax = int(bldpoly.extent.YMax)+1
+        
     
+        # Loop through the building in the downtown_buildings array
+        # and append all the green, red, and blue values to the sdarray
+        for j in range (bymin, bymax):
+            for i in range (bxmin, bxmax):
+                if (arcpy.Point(i,j).within(bldpoly)):
+                    #print (nlcd[1][i-bxmin][j-bymin])
+                    sdarray_green.append(nlcd[1][i-bxmin][j-bymin])
+                    sdarray_red.append(nlcd[0][i-bxmin][j-bymin])
+                    sdarray_blue.append(nlcd[2][i-bxmin][j-bymin])
+                    
+        # Convert to numpy array to take standard dev
+        arr_green = np.array(sdarray_green)
+        arr_red = np.array(sdarray_red)
+        arr_blue = np.array(sdarray_blue)
+        print ('green: ' + str(np.std(arr_green)) + ' red: ' + str(np.std(arr_red)) + ' blue: ' + str(np.std(arr_blue)))
+        print len(sdarray_green)
     
-    # Loop through the building in the downtown_buildings array
-    # and append all the green, red, and blue values to the sdarray
-    for j in range (bymin, bymax):
-        for i in range (bxmin, bxmax):
-            if (arcpy.Point(i,j).within(buildings[3])):
-                #print (nlcd[1][i-bxmin][j-bymin])
-                sdarray_green.append(nlcd[1][i-bxmin][j-bymin])
-                sdarray_red.append(nlcd[0][i-bxmin][j-bymin])
-                sdarray_blue.append(nlcd[2][i-bxmin][j-bymin])
-                
-    # Convert to numpy array to take standard dev
-    arr_green = np.array(sdarray_green)
-    arr_red = np.array(sdarray_red)
-    arr_blue = np.array(sdarray_blue)
-    print ('green: ' + str(np.std(arr_green)) + ' red: ' + str(np.std(arr_red)) + ' blue: ' + str(np.std(arr_blue)))
-    
-    # Do something with these stds! UpdateCursor with columns for each std
+    # Update the cursor row with each std
+        row[1] = np.std(arr_red)
+        row[2] = np.std(arr_green)
+        row[3] = np.std(arr_blue)
+        cursor.updateRow(row)
+        
+del row
+del cursor
 
 
 
 # convert building polygon to a raster
-# nlcd[x][y] is centroid? of the building. Can we refer to that building, and get the standard deviation?
+# nlcd[x][y] is centroid? of the building. 
 
 
     
