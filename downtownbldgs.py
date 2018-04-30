@@ -58,19 +58,19 @@ def building_array(x_coords, y_coords, shape_file, out_shape, all_buildings, tot
     out_cursor = arcpy.da.InsertCursor(out_shape, fields)
     with arcpy.da.SearchCursor(shape_file, fields) as cursor:
         for row in cursor:
-            all_buildings = all_buildings + 1
-            total_area_all_buildings = total_area_all_buildings + row[4].area
             shape = row[1]
             # shape[0] shape[1] is the x y of the centroid of the polygon (building)
             if shape[0] > x_coords[0] and shape[0] < x_coords[1] and shape[1] > y_coords[0] and shape[1] < y_coords[
-                1] and row[3] > elev_thresh:
+                1]: #and row[3] > elev_thresh:
+                all_buildings = all_buildings + 1
+                total_area_all_buildings = total_area_all_buildings + row[4].area
                 # row[2] is elevation, want to be at least 30
                 # Does not add blank polygons to the array or buildings already added
                 # Will probably need to add the blank polygons since they are buildings downtown, but
                 # just for testing, I only added the buildings that have names associated with the polygon.
                 if row[1] != " " and building_name != row[1]:
                     area = row[4].area
-                    if area > area_thresh:
+                    if area > area_thresh and row[3] > elev_thresh:
                         total_area = total_area + area
                         downtown_buildings.append(row)
                         out_cursor.insertRow(row)
@@ -86,8 +86,8 @@ def print_info(downtown_buildings, all_buildings, total_area_all_buildings, tota
     print("Length of array or number of usable buildings: " + str(len(downtown_buildings)))
     print("Total number of buildings: " + str(all_buildings))
     print("Total area of all building: " + str(total_area_all_buildings) + "sqft")
-    per_of_usable_buildings = float(len(downtown_buildings) / all_buildings)
-    per_of_usable_building_area = total_area_all_buildings /total_area
+    per_of_usable_buildings = float(len(downtown_buildings)) / float(all_buildings) * 100
+    per_of_usable_building_area = total_area_all_buildings /total_area * 100
 
     print("Percent of usable buildings: %" + str(per_of_usable_buildings))
     print("Percent of usable area: %" + str(per_of_usable_building_area))
