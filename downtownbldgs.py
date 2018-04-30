@@ -5,6 +5,7 @@ import arcpy.sa as sa
 import numpy as np
 import math
 import os
+import matplotlib.pyplot as plt
 
 def get_workspace():
     """This method simply checks the current directory of the working computer
@@ -27,7 +28,10 @@ def get_raster_path():
         return 'C:/Users/tommarquez/Documents/School/Geospatial-Programming_files/1659_2635/1659_2635.tif'
     return 'C:/Users/Valerie/Desktop/square_tiff/1659_2635.tif' # Done TODO: Valerie, add the full path of your raster file here
 
-def building_array(x_coords, y_coords, shape_file, out_shape):
+#def build_pie_chart(all_buildings, ):
+
+
+def building_array(x_coords, y_coords, shape_file, out_shape, all_buildings, total_area_all_buildings):
     """This method takes in the x and y coordinates that define the area of focus of the 
     shape file.
     Returns: a building array, total usable area, and the amount of solar panels that can 
@@ -54,6 +58,8 @@ def building_array(x_coords, y_coords, shape_file, out_shape):
     out_cursor = arcpy.da.InsertCursor(out_shape, fields)
     with arcpy.da.SearchCursor(shape_file, fields) as cursor:
         for row in cursor:
+            all_buildings = all_buildings + 1
+            total_area_all_buildings = total_area_all_buildings + row[4].area
             shape = row[1]
             # shape[0] shape[1] is the x y of the centroid of the polygon (building)
             if shape[0] > x_coords[0] and shape[0] < x_coords[1] and shape[1] > y_coords[0] and shape[1] < y_coords[
@@ -74,26 +80,40 @@ def building_array(x_coords, y_coords, shape_file, out_shape):
     del cursor
     del out_cursor
     
-    return downtown_buildings, total_area, total_panels
+    return downtown_buildings, total_area, total_panels, all_buildings, total_area_all_buildings
+
+def print_info(downtown_buildings, all_buildings, total_area_all_buildings, total_area):
+    print("Length of array or number of usable buildings: " + str(len(downtown_buildings)))
+    print("Total number of buildings: " + str(all_buildings))
+    print("Total area of all building: " + str(total_area_all_buildings) + "sqft")
+    per_of_usable_buildings = float(len(downtown_buildings) / all_buildings)
+    per_of_usable_building_area = total_area_all_buildings /total_area
+
+    print("Percent of usable buildings: %" + str(per_of_usable_buildings))
+    print("Percent of usable area: %" + str(per_of_usable_building_area))
 
 def is_south_building_taller(shape_file, x_coords, y_coords):
     """This method should return true if building south of the building at
     x y coords is taller
     This method converts the shape file to raster and uses a moving window to look
     at the polygon south
+    TODO: Method is unfinished
     """
     raster_ext = 'raster.tif'
     if arcpy.Exists(raster_ext):
         arcpy.Delete_management(raster_ext)
         print("WARNING: deleting file " + raster_ext)
     raster_file = arcpy.FeatureToRaster_conversion(shape_file, "elevation", raster_ext)
-    print(raster_file)
 
 env.workspace = get_workspace()
 fc = "buildings.shp"
 out_fc = "anch_good_sites.shp"
 if arcpy.Exists(out_fc):
     arcpy.Delete_management(out_fc)
+
+# Var that holds the total number of buildings within the given area
+all_buildings = 0
+total_area_all_buildings = 0
 
 # Need to set the Spatial Reference of the out_fc. 
 sr = 'NAD 1983 StatePlane Alaska 4 FIPS 5004 Feet'
@@ -126,16 +146,16 @@ x_coords = [1659059.606, 1661932.002]
 y_coords = [2635011.822, 2637910.260]
 
 # Array to hold all of the buildings downtown, var for total area, and var for total panels in given area
-downtown_buildings, total_area, total_panels = building_array(x_coords, y_coords, fc, out_fc)
+downtown_buildings, total_area, total_panels, all_buildings, total_area_all_buildings = building_array(x_coords, y_coords, fc, out_fc, all_buildings, total_area_all_buildings)
+
+print_info(downtown_buildings, all_buildings, total_area, total_area_all_buildings)
 
 # add field to shape for the std values, red, green, blue, for each building  
 arcpy.AddField_management(out_fc, 'std_red', "FLOAT")
 arcpy.AddField_management(out_fc, 'std_green', "FLOAT")
 arcpy.AddField_management(out_fc, 'std_blue', "FLOAT")    
 
-
 is_south_building_taller(fc, x_coords, y_coords)
-
 
 # loop through all buildings in array that are in the raster we are looking at
 # eventually, we will look at all the rasters ...
@@ -177,8 +197,8 @@ with arcpy.da.UpdateCursor(out_fc, ["SHAPE@", "std_red", "std_green", "std_blue"
         arr_green = np.array(sdarray_green)
         arr_red = np.array(sdarray_red)
         arr_blue = np.array(sdarray_blue)
-        print ('green: ' + str(np.std(arr_green)) + ' red: ' + str(np.std(arr_red)) + ' blue: ' + str(np.std(arr_blue)))
-        print len(sdarray_green)
+        #print ('green: ' + str(np.std(arr_green)) + ' red: ' + str(np.std(arr_red)) + ' blue: ' + str(np.std(arr_blue)))
+        #print len(sdarray_green)
     
     # Update the cursor row with each std
         row[1] = np.std(arr_red)
