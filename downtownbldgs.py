@@ -1,4 +1,9 @@
-
+# Valerie Manfull and Tom Marquez
+# CSCE 490
+# Final Project
+# Anchorage Solar Siting Survey
+#
+#
 import arcpy
 from arcpy import env
 import arcpy.sa as sa
@@ -6,6 +11,7 @@ import numpy as np
 import math
 import os
 
+# Tom wrote get_workspace
 def get_workspace():
     """This method simply checks the current directory of the working computer
     and returns the workspace.
@@ -17,6 +23,7 @@ def get_workspace():
         return "C:/Users/tommarquez/Documents/School/Geospatial-Programming/buildings"
     return "C:/Users/Valerie/Desktop/buildings"
 
+# Tom wrote get_raster_path
 def get_raster_path():
     """Similar method as above, this one just returns the location of the raster file, 
     since the raster file will more than likely not be in the same directory of the workspace
@@ -27,6 +34,11 @@ def get_raster_path():
         return 'C:/Users/tommarquez/Documents/School/Geospatial-Programming_files/1659_2635/1659_2635.tif'
     return 'C:/Users/Valerie/Desktop/square_tiff/1659_2635.tif' # Done TODO: Valerie, add the full path of your raster file here
 
+# Tom wrote initial code
+# Tom and Valerie together added elevation
+# Tom moved this into a method
+# Valerie added out_cursor, so results would be in a shape file
+#
 def building_array(x_coords, y_coords, shape_file, out_shape):
     """This method takes in the x and y coordinates that define the area of focus of the 
     shape file.
@@ -48,34 +60,31 @@ def building_array(x_coords, y_coords, shape_file, out_shape):
     downtown_buildings = []
     # Variable that stores the last seen building
     # Prevents a polygon being added to the array more than once
-    building_name = ""
+    # building_name = ""
     fields = ["FID", "SHAPE@XY", "CURRENT_TI", "ELEVATION", "SHAPE@"]
     # max_area = 0
     out_cursor = arcpy.da.InsertCursor(out_shape, fields)
     with arcpy.da.SearchCursor(shape_file, fields) as cursor:
         for row in cursor:
             shape = row[1]
-            # shape[0] shape[1] is the x y of the centroid of the polygon (building)
+            # shape[0] shape[1] is the x y of the centroid (?) of the polygon (building)
             if shape[0] > x_coords[0] and shape[0] < x_coords[1] and shape[1] > y_coords[0] and shape[1] < y_coords[
                 1] and row[3] > elev_thresh:
-                # row[2] is elevation, want to be at least 30
-                # Does not add blank polygons to the array or buildings already added
-                # Will probably need to add the blank polygons since they are buildings downtown, but
-                # just for testing, I only added the buildings that have names associated with the polygon.
-                if row[1] != " " and building_name != row[1]:
-                    area = row[4].area
-                    if area > area_thresh:
-                        total_area = total_area + area
-                        downtown_buildings.append(row)
-                        out_cursor.insertRow(row)
+                
+                area = row[4].area
+                if area > area_thresh:
+                    total_area = total_area + area
+                    downtown_buildings.append(row)
+                    out_cursor.insertRow(row)
+                    total_panels = total_panels + math.floor(area / solar_panel)
                         
-                        total_panels = total_panels + math.floor(area / solar_panel)
     del row
     del cursor
     del out_cursor
     
     return downtown_buildings, total_area, total_panels
 
+# Tom wrote is_south_building_taller
 def is_south_building_taller(shape_file, x_coords, y_coords):
     """This method should return true if building south of the building at
     x y coords is taller
@@ -88,6 +97,11 @@ def is_south_building_taller(shape_file, x_coords, y_coords):
         print("WARNING: deleting file " + raster_ext)
     raster_file = arcpy.FeatureToRaster_conversion(shape_file, "elevation", raster_ext)
     print(raster_file)
+
+# main code initially written by Tom
+# Most was written together
+# Valerie added out_fc shapefile, spatial reference, and standard deviation stuff
+# Standard dev stuff should be in a method ... 
 
 env.workspace = get_workspace()
 fc = "buildings.shp"
@@ -115,13 +129,14 @@ arcpy.CheckInExtension("Spatial")
 nlcd = arcpy.RasterToNumPyArray(nlcd_rstr)
 
 # Variables to hold the x and y coordinates of downtown
-#x_coords = [1655468.109, 1663714.632]
-#y_coords = [2635419.875, 2638805.296]
 # Tom's original
 #x_coords = [1655760.854, 1661815.541]
 #y_coords = [2637870.993, 5637870.993]
+# Valerie adjusted the coords so they would be part of downtown
+#x_coords = [1655468.109, 1663714.632]
+#y_coords = [2635419.875, 2638805.296]
 
-# buildings in 1659_2635.tif
+# x, y coords for buildings in NLCD raster 1659_2635.tif 
 x_coords = [1659059.606, 1661932.002]
 y_coords = [2635011.822, 2637910.260]
 
@@ -140,7 +155,11 @@ is_south_building_taller(fc, x_coords, y_coords)
 # loop through all buildings in array that are in the raster we are looking at
 # eventually, we will look at all the rasters ...
 
-#for buildings in downtown_buildings:
+#for buildings in downtown_buildings: # was looping through array
+
+# Valerie added the standard deviation fields to the out_fc,
+#    changed following code to read rows in out_fc,and update rows with the RGB stds
+# this could (should) be moved into its own method ...
 with arcpy.da.UpdateCursor(out_fc, ["SHAPE@", "std_red", "std_green", "std_blue"]) as cursor:
     for row in cursor:
         # array to hold the values that will be used to find the standard dev
@@ -149,14 +168,6 @@ with arcpy.da.UpdateCursor(out_fc, ["SHAPE@", "std_red", "std_green", "std_blue"
         sdarray_blue = []
         bldpoly = row[0]
         # add/sub 1 to include whole building
-        # bxmin = int(downtown_buildings[0][3].extent.XMin)-1
-        # bxmax = int(downtown_buildings[0][3].extent.XMax)+1
-        # bymin = int(downtown_buildings[0][3].extent.YMin)-1
-        # bymax = int(downtown_buildings[0][3].extent.YMax)+1
-        # bxmin = int(buildings[4].extent.XMin)-1
-        # bxmax = int(buildings[4].extent.XMax)+1
-        # bymin = int(buildings[4].extent.YMin)-1
-        # bymax = int(buildings[4].extent.YMax)+1
         bxmin = int(bldpoly.extent.XMin)-1
         bxmax = int(bldpoly.extent.XMax)+1
         bymin = int(bldpoly.extent.YMin)-1
@@ -177,8 +188,8 @@ with arcpy.da.UpdateCursor(out_fc, ["SHAPE@", "std_red", "std_green", "std_blue"
         arr_green = np.array(sdarray_green)
         arr_red = np.array(sdarray_red)
         arr_blue = np.array(sdarray_blue)
-        print ('green: ' + str(np.std(arr_green)) + ' red: ' + str(np.std(arr_red)) + ' blue: ' + str(np.std(arr_blue)))
-        print len(sdarray_green)
+        #print ('green: ' + str(np.std(arr_green)) + ' red: ' + str(np.std(arr_red)) + ' blue: ' + str(np.std(arr_blue)))
+        #print len(sdarray_green)
     
     # Update the cursor row with each std
         row[1] = np.std(arr_red)
